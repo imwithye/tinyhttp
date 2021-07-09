@@ -5,7 +5,10 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
@@ -17,6 +20,7 @@ var (
 	host     = kingpin.Flag("host", "IP address to listen.").Short('h').Default("127.0.0.1").IP()
 	port     = kingpin.Flag("port", "Port to listen.").Short('p').Default("0").Int()
 	dir      = kingpin.Flag("dir", "Directory to server.").Short('d').Default(".").String()
+	open     = kingpin.Flag("open", "Open in browser. Default true, --no-open to disable.").Default("true").Bool()
 )
 
 func init() {
@@ -40,6 +44,7 @@ func ParseArgs() {
 	log.Trace(fmt.Sprintf("host: %s", *host))
 	log.Trace(fmt.Sprintf("port: %d", *port))
 	log.Trace(fmt.Sprintf("dir: %s", *dir))
+	log.Trace(fmt.Sprintf("open: %v", *open))
 	log.Trace()
 }
 
@@ -54,11 +59,29 @@ func NewTCPListener() net.Listener {
 	return tcp
 }
 
+func OpenBrowser(url string) {
+	switch runtime.GOOS {
+	case "linux":
+		exec.Command("xdg-open", url).Start()
+	case "windows":
+		exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	case "darwin":
+		exec.Command("open", url).Start()
+	}
+}
+
 func main() {
 	ParseArgs()
 	tcp := NewTCPListener()
-	log.Info(fmt.Sprintf("tinyhttp serving %s on HTTP port http://%s:%d", *dir, *host, *port))
+	url := fmt.Sprintf("http://%s:%d", *host, *port)
+	log.Info(fmt.Sprintf("tinyhttp serving %s on HTTP port %s", *dir, url))
 	http.Handle("/", http.FileServer(http.Dir(*dir)))
+	if *open {
+		go func() {
+			<-time.After(100 * time.Millisecond)
+			OpenBrowser(url)
+		}()
+	}
 	err := http.Serve(tcp, nil)
 	if err != nil {
 		log.Fatal(err.Error())
