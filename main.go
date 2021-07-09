@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"time"
 
+	nested "github.com/antonfisher/nested-logrus-formatter"
 	log "github.com/sirupsen/logrus"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
@@ -24,7 +25,11 @@ var (
 )
 
 func init() {
-	log.SetFormatter(&log.TextFormatter{})
+	log.SetFormatter(&nested.Formatter{
+		HideKeys:        true,
+		NoColors:        true,
+		TimestampFormat: "2006-01-02 15:04:05",
+	})
 	log.SetOutput(os.Stdout)
 	log.SetLevel(log.InfoLevel)
 }
@@ -74,7 +79,8 @@ func main() {
 	ParseArgs()
 	tcp := NewTCPListener()
 	url := fmt.Sprintf("http://%s:%d", *host, *port)
-	log.Info(fmt.Sprintf("tinyhttp serving %s on HTTP port %s", *dir, url))
+	log.Info(fmt.Sprintf("Serving %s", *dir))
+	log.Info(fmt.Sprintf("Listening on HTTP port %s", url))
 	http.Handle("/", http.FileServer(http.Dir(*dir)))
 	if *open {
 		go func() {
