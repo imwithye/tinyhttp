@@ -11,6 +11,7 @@ import (
 	"time"
 
 	nested "github.com/antonfisher/nested-logrus-formatter"
+	"github.com/gorilla/handlers"
 	log "github.com/sirupsen/logrus"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
@@ -65,13 +66,18 @@ func NewTCPListener() net.Listener {
 }
 
 func OpenBrowser(url string) {
-	switch runtime.GOOS {
-	case "linux":
-		exec.Command("xdg-open", url).Start()
-	case "windows":
-		exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
-	case "darwin":
-		exec.Command("open", url).Start()
+	if *open {
+		go func() {
+			<-time.After(100 * time.Millisecond)
+			switch runtime.GOOS {
+			case "linux":
+				exec.Command("xdg-open", url).Start()
+			case "windows":
+				exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+			case "darwin":
+				exec.Command("open", url).Start()
+			}
+		}()
 	}
 }
 
@@ -81,13 +87,9 @@ func main() {
 	url := fmt.Sprintf("http://%s:%d", *host, *port)
 	log.Info(fmt.Sprintf("Serving %s", *dir))
 	log.Info(fmt.Sprintf("Listening on HTTP port %s", url))
-	http.Handle("/", http.FileServer(http.Dir(*dir)))
-	if *open {
-		go func() {
-			<-time.After(100 * time.Millisecond)
-			OpenBrowser(url)
-		}()
-	}
+	fmt.Print("\n\n")
+	http.Handle("/", handlers.CombinedLoggingHandler(os.Stdout, http.FileServer(http.Dir(*dir))))
+	OpenBrowser(url)
 	err := http.Serve(tcp, nil)
 	if err != nil {
 		log.Fatal(err.Error())
